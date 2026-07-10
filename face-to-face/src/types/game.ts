@@ -1,0 +1,19 @@
+export interface Character {
+  id: string;
+  name: string;
+  imageUrl: string;
+}
+
+export type GamePhase = "choosing-coringa" | "playing" | "finished";
+
+export interface GameView {
+  roomId: string;
+  phase: GamePhase;
+  characters: Character[];
+  opponentSecretCharacterId: string;
+  myCoringaId: string | null;
+  currentTurn: string;
+  eliminatedBy: Record<string, string[]>;
+  extraQuestions: number;
+  isPlayer1: boolean;
+}
