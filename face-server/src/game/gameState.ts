@@ -10,9 +10,11 @@ export interface GameState {
   secretCharacterOf: Record<string, string>;
   coringaOf: Record<string, string>;
   eliminatedBy: Record<string, string[]>;
+  selectedBy: Record<string, string[]>;
   currentTurn: string;
   extraQuestions: number;
   phase: GamePhase;
+  winnerId: string | null;
 }
 
 const games = new Map<string, GameState>();
@@ -33,6 +35,8 @@ export function createGame(
     [player2Id]: pickRandom(characters).id,
   };
 
+  console.log("DEBUG secretCharacterOf:", secretCharacterOf);
+
   const coringaOf: Record<string, string> = {
     [player1Id]: pickRandom(characters).id,
     [player2Id]: pickRandom(characters).id,
@@ -44,14 +48,19 @@ export function createGame(
     player2Id,
     characters,
     secretCharacterOf,
-    coringaOf,
+    coringaOf: {},
     eliminatedBy: {
+      [player1Id]: [],
+      [player2Id]: [],
+    },
+    selectedBy: {
       [player1Id]: [],
       [player2Id]: [],
     },
     currentTurn: player1Id,
     extraQuestions: 0,
     phase: "choosing-coringa",
+    winnerId: null,
   };
 
   games.set(roomId, game);
@@ -70,9 +79,9 @@ export function setCoringa(
   game.coringaOf[playerId] = characterId;
 
   const bothChose =
-    game.coringaOf[game.player1Id] && game.coringaOf[game.player2Id];
+    !!game.coringaOf[game.player1Id] && !!game.coringaOf[game.player2Id];
 
-    if (bothChose) {
+  if (Object.keys(game.coringaOf).length === 2) {
     game.phase = "playing";
   }
 

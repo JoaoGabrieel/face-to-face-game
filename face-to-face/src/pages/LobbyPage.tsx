@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useUser } from "../context/userContext";
 import { socket } from "../socket";
 import Chat from "../components/Chat";
+import { userGame } from "../context/gameContext";
 
 interface Player {
   id: string;
@@ -19,6 +20,13 @@ function LobbyPage() {
   const [copied, setCopied] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const hasJoined = useRef(false);
+
+  const handleStartGame = () => {
+    if (!roomId) return;
+    socket.emit("start-game", { roomId });
+  };
+
+  const canStart = players.length === 2;
 
   useEffect(() => {
     if (!username) {
@@ -49,6 +57,8 @@ function LobbyPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     });
+
+    const emptySlots = Math.max(0, MAX_PLAYERS - 1 - players.length);
   }
 
   const emptySlots = Math.max(0, MAX_PLAYERS - 1 - players.length);
@@ -86,7 +96,7 @@ function LobbyPage() {
         </div>
       </div>
 
-      <div className="w-full max-w-[560px] md:w-[620px] md:max-w-none flex flex-col gap-5">
+      <div className="w-full max-w-[560px] md:w-155 md:max-w-none flex flex-col gap-5">
         <div className="flex flex-col sm:flex-row gap-5 bg-[#781e2d]/50 rounded-2xl p-5 min-h-[420px]">
           <button className="flex-1 rounded-2xl bg-[#fbdad7] text-neutral-800 font-extrabold text-xl cursor-pointer flex items-end justify-center p-6 transition hover:brightness-95 hover:-translate-y-0.5 min-h-[180px] sm:min-h-full">
             MODO NORMAL
@@ -107,7 +117,15 @@ function LobbyPage() {
           >
             CONVIDAR
           </button>
-          <button className="flex-1 h-16 rounded-2xl font-extrabold text-lg cursor-pointer bg-white/85 text-neutral-800 transition hover:brightness-95 active:scale-[0.97]">
+          <button
+            onClick={handleStartGame}
+            disabled={!canStart}
+            className={`flex-1 h-16 rounded-2xl font-extrabold text-lg bg-white/85 text-neutral-800 transition active:scale-[0.97] ${
+              canStart
+                ? "cursor-pointer hover:brightness-95"
+                : "opacity-50 cursor-not-allowed"
+            }`}
+          >
             INICIAR
           </button>
         </div>

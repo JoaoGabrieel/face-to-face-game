@@ -1,8 +1,9 @@
 import express from "express";
-import http from "http";
+import http, { get } from "http";
 import cors from "cors";
 import { Server, Socket } from "socket.io";
 import { createGame, setCoringa, getGame, GameState } from "./game/gameState";
+import { strict } from "assert";
 
 const app = express();
 app.use(cors());
@@ -36,6 +37,7 @@ function getPlayers(roomId: string): Player[] {
 function buildPlayerView(game: GameState, forPlayerId: string) {
   const opponentId =
     forPlayerId === game.player1Id ? game.player2Id : game.player1Id;
+  const turnPlayerId = game.currentTurn;
 
   return {
     roomId: game.roomId,
@@ -43,11 +45,28 @@ function buildPlayerView(game: GameState, forPlayerId: string) {
     characters: game.characters,
     opponentSecretCharacterId: game.secretCharacterOf[opponentId],
     myCoringaId: game.coringaOf[forPlayerId] ?? null,
+    myEliminated: game.eliminatedBy[forPlayerId] ?? [],
+    mySelected: game.selectedBy[forPlayerId] ?? [],
+    turnPlayerEliminated: game.eliminatedBy[turnPlayerId] ?? [],
+    turnPlayerSelected: game.selectedBy[turnPlayerId] ?? [],
     currentTurn: game.currentTurn,
     eliminatedBy: game.eliminatedBy,
     extraQuestions: game.extraQuestions,
     isPlayer1: forPlayerId === game.player1Id,
+    turnIsPlayer1: turnPlayerId === game.player1Id,
+    winnerId: game.winnerId,
   };
+}
+
+function broadcastGameUpdate(game: GameState) {
+  io.to(game.player1Id).emit(
+    "game-update",
+    buildPlayerView(game, game.player1Id),
+  );
+  io.to(game.player2Id).emit(
+    "game-update",
+    buildPlayerView(game, game.player2Id),
+  );
 }
 
 io.on("connection", (socket: Socket) => {
@@ -127,6 +146,89 @@ io.on("connection", (socket: Socket) => {
     io.to(roomId).emit("players-update", remaining);
     console.log(`Cliente desconectado: ${socket.id}`);
   });
+
+  socket.on(
+    "toggle-select",
+    ({ roomId, characterId }: { roomId: string; characterId: string }) => {
+      const game = getGame(roomId);
+      if (!game || game.phase !== "playing") return;
+      if (socket.id !== game.currentTurn) return;
+
+      const list = game.selectedBy[socket.id];
+      const idx = list.indexOf(characterId);
+      if (idx >= 0) list.splice(idx, 1);
+      else list.push(characterId);
+
+      broadcastGameUpdate(game);
+    },
+  );
+
+  socket.on(
+    "toggle-discard",
+    ({ roomId, characterId }: { roomId: string; characterId: string }) => {
+      const game = getGame(roomId);
+      if (!game || game.phase !== "playing") return;
+      if (socket.id !== game.currentTurn) return;
+
+      const list = game.eliminatedBy[socket.id];
+      const idx = list.indexOf(characterId);
+      if (idx >= 0) list.splice(idx, 1);
+      else list.push(characterId);
+
+      broadcastGameUpdate(game);
+    },
+  );
+
+  socket.on("pass-turn", ({ roomId }: { roomId: string }) => {
+    const game = getGame(roomId);
+    if (!game || game.phase !== "playing") return;
+    if (socket.id !== game.currentTurn) return;
+
+    const opponentId =
+      socket.id === game.player1Id ? game.player2Id : game.player1Id;
+
+    if (game.extraQuestions > 0) {
+      game.extraQuestions -= 1;
+      if (game.extraQuestions === 0) {
+        game.currentTurn = opponentId;
+      }
+    } else {
+      game.currentTurn = opponentId;
+    }
+    broadcastGameUpdate(game);
+  });
+
+  // socket.on("debug-get-secret", ({ roomId }: { roomId: string }) => {
+  //   const game = getGame(roomId);
+  //   if (!game) return;
+  //   socket.emit("debug-secret", { secret: game.secretCharacterOf[socket.id] });
+  // });
+
+  socket.on(
+    "final-answer",
+    ({ roomId, characterId }: { roomId: string; characterId: string }) => {
+      const game = getGame(roomId);
+      if (!game || game.phase !== "playing") return;
+      if (socket.id !== game.currentTurn) return;
+
+      const opponentId =
+        socket.id === game.player1Id ? game.player2Id : game.player1Id;
+      const mySecret = game.secretCharacterOf[socket.id];
+      const opponentTrap = game.coringaOf[opponentId];
+
+      if (characterId === opponentTrap) {
+        game.winnerId = opponentId;
+        game.phase = "finished";
+      } else if (characterId === mySecret) {
+        game.winnerId = socket.id;
+        game.phase = "finished";
+      } else {
+        game.currentTurn = opponentId;
+        game.extraQuestions = 2;
+      }
+      broadcastGameUpdate(game);
+    },
+  );
 });
 
 const PORT = process.env.PORT ?? 3001;

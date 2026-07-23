@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import { UserProvider } from "./context/userContext";
 import { GameProvider } from "./context/gameContext";
+import GameNavigator from "./components/GameNavigator";
 import UsernamePage from "./pages/UsernamePage";
 import LobbyPage from "./pages/LobbyPage";
 import CoringaPage from "./pages/CoringaPage";
@@ -10,6 +11,7 @@ function App() {
   return (
     <UserProvider>
       <GameProvider>
+        <GameNavigator />
         <Routes>
           <Route path="/" element={<UsernamePage />} />
           <Route path="/lobby/:roomId" element={<LobbyPage />} />
