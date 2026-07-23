@@ -9,6 +9,8 @@ function GamePage() {
   const { gameView } = userGame();
   const [finalAnswerMode, setFinalAnswerMode] = useState(false);
   const [pendingFinalId, setPendingFinalId] = useState<string | null>(null);
+  const [questionText, setQuestionText] = useState("");
+  const [answerText, setAnswerText] = useState("");
 
   if (!gameView) {
     return (
@@ -78,6 +80,18 @@ function GamePage() {
     return !isMyTurn && characterId === gameView!.myCoringaId;
   }
 
+  function handleSubmitQuestion() {
+    if (!roomId || !questionText.trim()) return;
+    socket.emit("submit-question", { roomId, question: questionText.trim() });
+    setQuestionText("");
+  }
+
+  function handleSubmitAnswer() {
+    if (!roomId || !answerText.trim()) return;
+    socket.emit("submit-answer", { roomId, answer: answerText.trim() });
+    setAnswerText("");
+  }
+
   return (
     <div
       className={`min-h-screen w-full flex flex-col items-center gap-6 ${bgClass} p-6 sm:p-10`}
@@ -88,12 +102,72 @@ function GamePage() {
         </div>
         <div className="flex-1 bg-white rounded-full px-6 py-3 shadow-md">
           <p className="text-neutral-700 font-bold text-center text-sm sm:text-base">
-            {isMyTurn
-              ? "Sua vez — faça uma pergunta"
-              : "Aguardando pergunta do adversário"}
+            {gameView.pendingQuestion
+              ? gameView.pendingQuestion
+              : isMyTurn
+                ? "Sua vez — faça uma pergunta"
+                : "Aguardando pergunta do adversário"}
           </p>
         </div>
       </div>
+
+      {isMyTurn && !gameView.pendingQuestion && (
+        <div className="w-full flex gap-2">
+          <input
+            value={questionText}
+            onChange={(e) => setQuestionText(e.target.value)}
+            placeholder="digite sua pergunta"
+            className="flex-1 rounded-full px-5 py-3 font-semibold text-neutral-800 placeholder-neutral-400 bg-white shadow-md outline-none focus:ring-4 focus:ring-yellow-400"
+          />
+          <button
+            onClick={handleSubmitQuestion}
+            disabled={!questionText.trim()}
+            className={`rounded-full px-6 font-extrabold shadow-md transition ${
+              questionText.trim()
+                ? "bg-white text-neutral-800 cursor-pointer hover:brightness-95"
+                : "bg-white/50 text-neutral-500 cursor-not-allowed"
+            }`}
+          >
+            Enviar
+          </button>
+        </div>
+      )}
+
+      {!isMyTurn && gameView.pendingQuestion && !gameView.pendingAnswer && (
+        <div className="w-full flex gap-2">
+          <input
+            value={answerText}
+            onChange={(e) => setAnswerText(e.target.value)}
+            placeholder="Digite uma dica"
+            className="flex-1 rounded-full px-5 py-3 font-semibold text-neutral-800 placeholder-neutral-400 bg-white shadow-md outline-none focus:ring-4 focus:ring-yellow-400"
+          />
+          <button
+            onClick={handleSubmitAnswer}
+            disabled={!answerText.trim()}
+            className={`rounded-full px-6 font-extrabold shadow-md transition ${
+              answerText.trim()
+                ? "bg-white text-neutral-800 cursor-pointer hover:brightness-95"
+                : "bg-white/50 text-neutral-500 cursor-not-allowed"
+            }`}
+          >
+            Enviar
+          </button>
+        </div>
+      )}
+
+      {isMyTurn && gameView.pendingQuestion && !gameView.pendingAnswer && (
+        <p className="text-white/80 font-semibold text-sm">
+          Aguardando resposta...
+        </p>
+      )}
+
+      {isMyTurn && gameView.pendingAnswer && (
+        <div className="w-full bg-white/90 rounded-2xl px-5 py-3">
+          <p className="text-neutral-700 font-bold text-center">
+            Resposta: {gameView.pendingAnswer}
+          </p>
+        </div>
+      )}
 
       <div className="w-full max-w-4xl bg-black/10 rounded-3xl p-5">
         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">

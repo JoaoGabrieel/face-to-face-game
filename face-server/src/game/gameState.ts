@@ -15,6 +15,8 @@ export interface GameState {
   extraQuestions: number;
   phase: GamePhase;
   winnerId: string | null;
+  pendingQuestion: string | null;
+  pendingAnswer: string | null;
 }
 
 const games = new Map<string, GameState>();
@@ -61,6 +63,8 @@ export function createGame(
     extraQuestions: 0,
     phase: "choosing-coringa",
     winnerId: null,
+    pendingQuestion: null,
+    pendingAnswer: null,
   };
 
   games.set(roomId, game);

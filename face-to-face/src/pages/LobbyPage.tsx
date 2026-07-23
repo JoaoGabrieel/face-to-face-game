@@ -20,13 +20,10 @@ function LobbyPage() {
   const [copied, setCopied] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const hasJoined = useRef(false);
+  const [selectedMode, setSelectedMode] = useState<string | null>(null);
 
-  const handleStartGame = () => {
-    if (!roomId) return;
-    socket.emit("start-game", { roomId });
-  };
-
-  const canStart = players.length === 2;
+  const isHost = players[0]?.id === socket.id;
+  const canStart = isHost && selectedMode === "normal" && players.length === 2;
 
   useEffect(() => {
     if (!username) {
@@ -44,12 +41,28 @@ function LobbyPage() {
       setPlayers(updatedPlayers);
     }
 
+    function onModeUpdate(mode: string) {
+      setSelectedMode(mode);
+    }
+
     socket.on("players-update", onPlayersUpdate);
+    socket.on("mode-update", onModeUpdate);
 
     return () => {
       socket.off("players-update", onPlayersUpdate);
+      socket.off("mode-update", onModeUpdate);
     };
   }, [roomId, username, navigate]);
+
+  function handleSelecteMode(mode: string) {
+    if (!isHost || !roomId) return;
+    socket.emit("select-mode", { roomId, mode });
+  }
+
+  function handleStartGame() {
+    if (!roomId) return;
+    socket.emit("start-game", { roomId });
+  }
 
   function handleInvite() {
     const link = `${window.location.origin}/?room=${roomId}`;
@@ -98,7 +111,15 @@ function LobbyPage() {
 
       <div className="w-full max-w-[560px] md:w-155 md:max-w-none flex flex-col gap-5">
         <div className="flex flex-col sm:flex-row gap-5 bg-[#781e2d]/50 rounded-2xl p-5 min-h-[420px]">
-          <button className="flex-1 rounded-2xl bg-[#fbdad7] text-neutral-800 font-extrabold text-xl cursor-pointer flex items-end justify-center p-6 transition hover:brightness-95 hover:-translate-y-0.5 min-h-[180px] sm:min-h-full">
+          <button
+            onClick={() => handleSelecteMode("normal")}
+            disabled={!isHost}
+            className={`flex-1 rounded-2xl font-extrabold text-xl flex items-end justify-center p-6 min-h-[180px] sm:min-h-full transition ${
+              selectedMode === "normal"
+                ? "bg-white ring-4 ring-yellow-400"
+                : "bg-[#fbdad7]"
+            } ${isHost ? "cursor-pointer hover:brightness-95 hover:-translate-y-0.5" : "opacity-60 cursor-not-allowed"}`}
+          >
             MODO NORMAL
           </button>
           <div className="flex-1 flex flex-col gap-5">

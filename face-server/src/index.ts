@@ -10,6 +10,13 @@ app.use(cors());
 
 const server = http.createServer(app);
 
+const roomModes = new Map<string, string | null>();
+
+function isHost(roomId: string, socketId: string): boolean {
+  const players = getPlayers(roomId);
+  return players[0]?.id === socketId;
+}
+
 const io = new Server(server, {
   cors: {
     origin: "*",
@@ -55,6 +62,8 @@ function buildPlayerView(game: GameState, forPlayerId: string) {
     isPlayer1: forPlayerId === game.player1Id,
     turnIsPlayer1: turnPlayerId === game.player1Id,
     winnerId: game.winnerId,
+    pendingQuestion: game.pendingQuestion,
+    pendingAnswer: game.pendingAnswer,
   };
 }
 
@@ -75,6 +84,8 @@ io.on("connection", (socket: Socket) => {
   socket.on("start-game", ({ roomId }: { roomId: string }) => {
     const roomPlayers = getPlayers(roomId);
     if (roomPlayers.length !== 2) return;
+    if (!isHost(roomId, socket.id)) return;
+    if (roomModes.get(roomId) !== "normal") return;
 
     const [player1, player2] = roomPlayers;
     const game = createGame(roomId, player1.id, player2.id);
@@ -97,6 +108,15 @@ io.on("connection", (socket: Socket) => {
         "game-update",
         buildPlayerView(game, game.player2Id),
       );
+    },
+  );
+
+  socket.on(
+    "select-mode",
+    ({ roomId, mode }: { roomId: string; mode: string }) => {
+      if (!isHost(roomId, socket.id)) return;
+      roomModes.set(roomId, mode);
+      io.to(roomId).emit("mode-update", mode);
     },
   );
 
@@ -139,6 +159,7 @@ io.on("connection", (socket: Socket) => {
 
     if (remaining.length === 0) {
       rooms.delete(roomId);
+      roomModes.delete(roomId);
     } else {
       rooms.set(roomId, remaining);
     }
@@ -191,9 +212,14 @@ io.on("connection", (socket: Socket) => {
       game.extraQuestions -= 1;
       if (game.extraQuestions === 0) {
         game.currentTurn = opponentId;
+        game.pendingQuestion = null;
+        game.pendingAnswer = null;
       }
     } else {
       game.currentTurn = opponentId;
+      game.extraQuestions = 2;
+      game.pendingQuestion = null;
+      game.pendingAnswer = null;
     }
     broadcastGameUpdate(game);
   });
@@ -203,6 +229,34 @@ io.on("connection", (socket: Socket) => {
   //   if (!game) return;
   //   socket.emit("debug-secret", { secret: game.secretCharacterOf[socket.id] });
   // });
+
+  socket.on(
+    "submit-question",
+    ({ roomId, question }: { roomId: string; question: string }) => {
+      const game = getGame(roomId);
+      if (!game || game.phase !== "playing") return;
+      if (socket.id !== game.currentTurn) return;
+      if (!question.trim()) return;
+
+      game.pendingQuestion = question.trim();
+      game.pendingAnswer = null;
+      broadcastGameUpdate(game);
+    },
+  );
+
+  socket.on(
+    "submit-answer",
+    ({ roomId, answer }: { roomId: string; answer: string }) => {
+      const game = getGame(roomId);
+      if (!game || game.phase !== "playing") return;
+      if (socket.id === game.currentTurn) return;
+      if (!game.pendingQuestion || game.pendingAnswer) return;
+      if (!answer.trim()) return;
+
+      game.pendingAnswer = answer.trim();
+      broadcastGameUpdate(game);
+    },
+  );
 
   socket.on(
     "final-answer",

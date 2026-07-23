@@ -22,4 +22,6 @@ export interface GameView {
   isPlayer1: boolean;
   turnIsPlayer1: boolean;
   winnerId: string | null;
+  pendingQuestion: string | null;
+  pendingAnswer: string | null;
 }
