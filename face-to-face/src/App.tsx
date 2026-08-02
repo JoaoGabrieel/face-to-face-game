@@ -6,6 +6,7 @@ import UsernamePage from "./pages/UsernamePage";
 import LobbyPage from "./pages/LobbyPage";
 import CoringaPage from "./pages/CoringaPage";
 import GamePage from "./pages/GamePage";
+import ResultadoPage from "./pages/ResultadoPage";
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
           <Route path="/lobby/:roomId" element={<LobbyPage />} />
           <Route path="/coringa/:roomId" element={<CoringaPage />} />
           <Route path="/game/:roomId" element={<GamePage />} />
+          <Route path="/resultado/:roomId" element={<ResultadoPage />} />
         </Routes>
       </GameProvider>
     </UserProvider>

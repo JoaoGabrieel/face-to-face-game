@@ -2,7 +2,7 @@ import { useParams } from "react-router-dom";
 import { socket } from "../socket";
 import { userGame } from "../context/gameContext";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function GamePage() {
   const { roomId } = useParams<{ roomId: string }>();
@@ -11,6 +11,14 @@ function GamePage() {
   const [pendingFinalId, setPendingFinalId] = useState<string | null>(null);
   const [questionText, setQuestionText] = useState("");
   const [answerText, setAnswerText] = useState("");
+  const [showWrongToast, setShowWrongToast] = useState(false);
+
+  useEffect(() => {
+    if (!gameView?.lastWrongAnswerAt) return;
+    setShowWrongToast(true);
+    const timer = setTimeout(() => setShowWrongToast(false), 3000);
+    return () => clearTimeout(timer);
+  }, [gameView?.lastWrongAnswerAt]);
 
   if (!gameView) {
     return (
@@ -96,6 +104,12 @@ function GamePage() {
     <div
       className={`min-h-screen w-full flex flex-col items-center gap-6 ${bgClass} p-6 sm:p-10`}
     >
+      {showWrongToast && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 bg-red-600 text-white font-extrabold px-6 py-3 rounded-xl z-[100] shadow-lg animate-pulse">
+          ❌ Resposta errada! {isMyTurn ? "Você ganhou" : "O adversário ganhou"}{" "}
+          2 perguntas extras!
+        </div>
+      )}
       <div className="w-full max-w-4xl flex items-center gap-4">
         <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center shrink-0 shadow-md">
           <span className="text-2xl">🎯</span>

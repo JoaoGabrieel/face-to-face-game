@@ -6,6 +6,8 @@ export interface GameState {
   roomId: string;
   player1Id: string;
   player2Id: string;
+  player1Username?: string;
+  player2Username?: string;
   characters: Character[];
   secretCharacterOf: Record<string, string>;
   coringaOf: Record<string, string>;
@@ -17,6 +19,7 @@ export interface GameState {
   winnerId: string | null;
   pendingQuestion: string | null;
   pendingAnswer: string | null;
+  lastWrongAnswer: number | null;
 }
 
 const games = new Map<string, GameState>();
@@ -29,6 +32,8 @@ export function createGame(
   roomId: string,
   player1Id: string,
   player2Id: string,
+  player1Username: string,
+  player2Username: string,
 ): GameState {
   const characters = generateRandomCharacter(20);
 
@@ -48,6 +53,8 @@ export function createGame(
     roomId,
     player1Id,
     player2Id,
+    player1Username,
+    player2Username,
     characters,
     secretCharacterOf,
     coringaOf: {},
@@ -65,6 +72,7 @@ export function createGame(
     winnerId: null,
     pendingQuestion: null,
     pendingAnswer: null,
+    lastWrongAnswer: null,
   };
 
   games.set(roomId, game);

@@ -46,11 +46,24 @@ function buildPlayerView(game: GameState, forPlayerId: string) {
     forPlayerId === game.player1Id ? game.player2Id : game.player1Id;
   const turnPlayerId = game.currentTurn;
 
+  const winnerUsername =
+    game.winnerId === game.player1Id
+      ? game.player1Username
+      : game.winnerId === game.player2Id
+        ? game.player2Username
+        : null;
+
   return {
     roomId: game.roomId,
     phase: game.phase,
     characters: game.characters,
     opponentSecretCharacterId: game.secretCharacterOf[opponentId],
+    oppenentUsername:
+      forPlayerId === game.player1Id
+        ? game.player2Username
+        : game.player1Username,
+    mySecretCharacterId: game.secretCharacterOf[forPlayerId],
+    opponentCoringaId: game.coringaOf[opponentId] ?? null,
     myCoringaId: game.coringaOf[forPlayerId] ?? null,
     myEliminated: game.eliminatedBy[forPlayerId] ?? [],
     mySelected: game.selectedBy[forPlayerId] ?? [],
@@ -62,8 +75,10 @@ function buildPlayerView(game: GameState, forPlayerId: string) {
     isPlayer1: forPlayerId === game.player1Id,
     turnIsPlayer1: turnPlayerId === game.player1Id,
     winnerId: game.winnerId,
+    winnerUsername,
     pendingQuestion: game.pendingQuestion,
     pendingAnswer: game.pendingAnswer,
+    lastWrongAnswer: game.lastWrongAnswer,
   };
 }
 
@@ -88,7 +103,13 @@ io.on("connection", (socket: Socket) => {
     if (roomModes.get(roomId) !== "normal") return;
 
     const [player1, player2] = roomPlayers;
-    const game = createGame(roomId, player1.id, player2.id);
+    const game = createGame(
+      roomId,
+      player1.id,
+      player2.id,
+      player1.username,
+      player2.username,
+    );
 
     io.to(player1.id).emit("game-update", buildPlayerView(game, player1.id));
     io.to(player2.id).emit("game-update", buildPlayerView(game, player2.id));
@@ -279,6 +300,9 @@ io.on("connection", (socket: Socket) => {
       } else {
         game.currentTurn = opponentId;
         game.extraQuestions = 2;
+        game.pendingQuestion = null;
+        game.pendingAnswer = null;
+        game.lastWrongAnswer = Date.now();
       }
       broadcastGameUpdate(game);
     },
