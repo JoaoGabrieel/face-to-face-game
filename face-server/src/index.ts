@@ -2,7 +2,13 @@ import express from "express";
 import http, { get } from "http";
 import cors from "cors";
 import { Server, Socket } from "socket.io";
-import { createGame, setCoringa, getGame, GameState } from "./game/gameState";
+import {
+  createGame,
+  setCoringa,
+  getGame,
+  deleteGame,
+  GameState,
+} from "./game/gameState";
 import { strict } from "assert";
 
 const app = express();
@@ -58,7 +64,7 @@ function buildPlayerView(game: GameState, forPlayerId: string) {
     phase: game.phase,
     characters: game.characters,
     opponentSecretCharacterId: game.secretCharacterOf[opponentId],
-    oppenentUsername:
+    opponentUsername:
       forPlayerId === game.player1Id
         ? game.player2Username
         : game.player1Username,
@@ -78,7 +84,7 @@ function buildPlayerView(game: GameState, forPlayerId: string) {
     winnerUsername,
     pendingQuestion: game.pendingQuestion,
     pendingAnswer: game.pendingAnswer,
-    lastWrongAnswer: game.lastWrongAnswer,
+    lastWrongAnswerAt: game.lastWrongAnswer,
   };
 }
 
@@ -113,6 +119,17 @@ io.on("connection", (socket: Socket) => {
 
     io.to(player1.id).emit("game-update", buildPlayerView(game, player1.id));
     io.to(player2.id).emit("game-update", buildPlayerView(game, player2.id));
+  });
+
+  socket.on("back-to-lobby", ({ roomId }: { roomId: string }) => {
+    console.log("SERVIDOR recebeu back-to-lobby:", {
+      socketId: socket.id,
+      roomId,
+    });
+    deleteGame(roomId);
+    roomModes.delete(roomId);
+    io.to(roomId).emit("return-to-lobby", { roomId });
+    console.log("SERVIDOR emitiu return-to-lobby pra sala:", roomId);
   });
 
   socket.on(
@@ -196,11 +213,13 @@ io.on("connection", (socket: Socket) => {
       if (!game || game.phase !== "playing") return;
       if (socket.id !== game.currentTurn) return;
 
-      const list = game.selectedBy[socket.id];
-      const idx = list.indexOf(characterId);
-      if (idx >= 0) list.splice(idx, 1);
-      else list.push(characterId);
+      const current = game.selectedBy[socket.id];
 
+      if (current.includes(characterId)) {
+        game.selectedBy[socket.id] = [];
+      } else {
+        game.selectedBy[socket.id] = [characterId];
+      }
       broadcastGameUpdate(game);
     },
   );
@@ -229,19 +248,11 @@ io.on("connection", (socket: Socket) => {
     const opponentId =
       socket.id === game.player1Id ? game.player2Id : game.player1Id;
 
-    if (game.extraQuestions > 0) {
-      game.extraQuestions -= 1;
-      if (game.extraQuestions === 0) {
-        game.currentTurn = opponentId;
-        game.pendingQuestion = null;
-        game.pendingAnswer = null;
-      }
-    } else {
-      game.currentTurn = opponentId;
-      game.extraQuestions = 2;
-      game.pendingQuestion = null;
-      game.pendingAnswer = null;
-    }
+    game.currentTurn = opponentId;
+    game.extraQuestions = 0;
+    game.pendingQuestion = null;
+    game.pendingAnswer = null;
+
     broadcastGameUpdate(game);
   });
 
@@ -258,6 +269,10 @@ io.on("connection", (socket: Socket) => {
       if (!game || game.phase !== "playing") return;
       if (socket.id !== game.currentTurn) return;
       if (!question.trim()) return;
+
+      if (game.extraQuestions > 0) {
+        game.extraQuestions -= 1;
+      }
 
       game.pendingQuestion = question.trim();
       game.pendingAnswer = null;
@@ -282,9 +297,21 @@ io.on("connection", (socket: Socket) => {
   socket.on(
     "final-answer",
     ({ roomId, characterId }: { roomId: string; characterId: string }) => {
+      console.log("SERVIDOR recebeu final-answer:", {
+        socketId: socket.id,
+        roomId,
+        characterId,
+      });
+
       const game = getGame(roomId);
-      if (!game || game.phase !== "playing") return;
-      if (socket.id !== game.currentTurn) return;
+      if (!game || game.phase !== "playing") {
+        console.log("BLOQUEADO: jogo não encontrado para roomId", roomId);
+        return;
+      }
+      if (socket.id !== game.currentTurn) {
+        console.log("BLOQUEADO: não é a vez do jogador", socket.id);
+        return;
+      }
 
       const opponentId =
         socket.id === game.player1Id ? game.player2Id : game.player1Id;
@@ -304,6 +331,16 @@ io.on("connection", (socket: Socket) => {
         game.pendingAnswer = null;
         game.lastWrongAnswer = Date.now();
       }
+      console.log("RESULTADO final-answer:", {
+        characterId,
+        mySecret,
+        opponentTrap,
+        winnerId: game.winnerId,
+        phase: game.phase,
+        extraQuestions: game.extraQuestions,
+        currentTurn: game.currentTurn,
+      });
+
       broadcastGameUpdate(game);
     },
   );

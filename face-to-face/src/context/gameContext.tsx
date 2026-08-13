@@ -10,6 +10,7 @@ import type { GameView } from "../types/game";
 
 interface GameContextType {
   gameView: GameView | null;
+  resetGame: () => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -21,14 +22,24 @@ export function GameProvider({ children }: { children: ReactNode }) {
     function onGameUpdate(view: GameView) {
       setGameView(view);
     }
+    function onReturnToLobby() {
+      console.log("GameContext recebeu return-to-lobby, limpando gameView");
+      setGameView(null);
+    }
 
     socket.on("game-update", onGameUpdate);
+    socket.on("game-return-to-lobby", onReturnToLobby);
     return () => {
       socket.off("game-update", onGameUpdate);
+      socket.off("game-return-to-lobby", onReturnToLobby);
     };
   }, []);
   return (
-    <GameContext.Provider value={{ gameView }}>{children}</GameContext.Provider>
+    <GameContext.Provider
+      value={{ gameView, resetGame: () => setGameView(null) }}
+    >
+      {children}
+    </GameContext.Provider>
   );
 }
 

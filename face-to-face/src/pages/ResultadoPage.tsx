@@ -1,9 +1,11 @@
 import { useNavigate } from "react-router-dom";
 import { userGame } from "../context/gameContext";
 import { socket } from "../socket";
+import { useParams } from "react-router-dom";
 
 function ResultadoPage() {
-  const { gameView } = userGame();
+  const { roomId } = useParams<{ roomId: string }>();
+  const { gameView, resetGame } = userGame();
   const navigate = useNavigate();
 
   if (!gameView) {
@@ -15,6 +17,15 @@ function ResultadoPage() {
   }
 
   const iWon = gameView.winnerId === socket.id;
+
+  function handleBackToLobby() {
+    if (!roomId) {
+      console.log("BLOQUEADO no front: roomId ausente");
+      return;
+    }
+    console.log("Emitindo back-to-lobby:", roomId);
+    socket.emit("back-to-lobby", { roomId });
+  }
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center gap-6 bg-gradient-to-b from-[#9c1e40] via-[#d94f2b] to-[#f2941a] p-6">
@@ -32,9 +43,12 @@ function ResultadoPage() {
 
       <button
         className="mt-4 h-14 px-8 rounded-2xl font-extrabold text-lg bg-white text-neutral-800 cursor-pointer hover:brightness-95 active:scale-[0.97]"
-        onClick={() => navigate("/")}
+        onClick={() => {
+          resetGame();
+          handleBackToLobby();
+        }}
       >
-        Voltar ao inicio
+        Voltar ao Lobby
       </button>
     </div>
   );

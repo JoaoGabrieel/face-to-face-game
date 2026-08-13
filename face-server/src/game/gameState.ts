@@ -27,6 +27,9 @@ const games = new Map<string, GameState>();
 function pickRandom<T>(array: T[]): T {
   return array[Math.floor(Math.random() * array.length)];
 }
+export function deleteGame(roomId: string): void {
+  games.delete(roomId);
+}
 
 export function createGame(
   roomId: string,

@@ -39,7 +39,14 @@ function GamePage() {
   }
 
   function confirmFinalAnswer() {
-    if (!roomId) return;
+    if (!roomId || !pendingFinalId) {
+      console.log("BLOQUEADO no front:", { roomId, pendingFinalId });
+      return;
+    }
+    console.log("Emitindo final-answer:", {
+      roomId,
+      characterId: pendingFinalId,
+    });
     socket.emit("final-answer", { roomId, characterId: pendingFinalId });
     setFinalAnswerMode(false);
     setPendingFinalId(null);
@@ -110,6 +117,13 @@ function GamePage() {
           2 perguntas extras!
         </div>
       )}
+      {gameView.extraQuestions > 0 && (
+        <div className="w-full max-w-4xl bg-yellow-300/90 text-neutral-800 font-bold text-center rounded-xl py-2 text-sm">
+          {isMyTurn
+            ? `Você tem ${gameView.extraQuestions} perguntas extras!`
+            : `O adversário tem ${gameView.extraQuestions} perguntas extras!`}
+        </div>
+      )}
       <div className="w-full max-w-4xl flex items-center gap-4">
         <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center shrink-0 shadow-md">
           <span className="text-2xl">🎯</span>
@@ -125,27 +139,29 @@ function GamePage() {
         </div>
       </div>
 
-      {isMyTurn && !gameView.pendingQuestion && (
-        <div className="w-full flex gap-2">
-          <input
-            value={questionText}
-            onChange={(e) => setQuestionText(e.target.value)}
-            placeholder="digite sua pergunta"
-            className="flex-1 rounded-full px-5 py-3 font-semibold text-neutral-800 placeholder-neutral-400 bg-white shadow-md outline-none focus:ring-4 focus:ring-yellow-400"
-          />
-          <button
-            onClick={handleSubmitQuestion}
-            disabled={!questionText.trim()}
-            className={`rounded-full px-6 font-extrabold shadow-md transition ${
-              questionText.trim()
-                ? "bg-white text-neutral-800 cursor-pointer hover:brightness-95"
-                : "bg-white/50 text-neutral-500 cursor-not-allowed"
-            }`}
-          >
-            Enviar
-          </button>
-        </div>
-      )}
+      {isMyTurn &&
+        (!gameView.pendingQuestion ||
+          (gameView.pendingAnswer && gameView.extraQuestions > 0)) && (
+          <div className="w-full flex gap-2">
+            <input
+              value={questionText}
+              onChange={(e) => setQuestionText(e.target.value)}
+              placeholder="digite sua pergunta"
+              className="flex-1 rounded-full px-5 py-3 font-semibold text-neutral-800 placeholder-neutral-400 bg-white shadow-md outline-none focus:ring-4 focus:ring-yellow-400"
+            />
+            <button
+              onClick={handleSubmitQuestion}
+              disabled={!questionText.trim()}
+              className={`rounded-full px-6 font-extrabold shadow-md transition ${
+                questionText.trim()
+                  ? "bg-white text-neutral-800 cursor-pointer hover:brightness-95"
+                  : "bg-white/50 text-neutral-500 cursor-not-allowed"
+              }`}
+            >
+              Enviar
+            </button>
+          </div>
+        )}
 
       {!isMyTurn && gameView.pendingQuestion && !gameView.pendingAnswer && (
         <div className="w-full flex gap-2">
@@ -192,6 +208,16 @@ function GamePage() {
             const isTrap = isTrapHint(character.id);
             const isPending = pendingFinalId === character.id;
 
+            const avatarBg = isTarget
+              ? "bg-orange-500"
+              : isTrap
+                ? "bg-neutral-900"
+                : isPending
+                  ? "bg-red-500"
+                  : selected && !finalAnswerMode
+                    ? "bg-yellow-400"
+                    : "bg-neutral-200";
+
             return (
               <button
                 key={character.id}
@@ -200,13 +226,11 @@ function GamePage() {
                 disabled={!isMyTurn && !finalAnswerMode}
                 className={`flex flex-col items-center rounded-2xl overflow-hidden transition ${
                   discarded ? "opacity-30" : ""
-                } ${selected ? "ring-4 ring-yellow-400" : ""} ${
-                  isTarget ? "ring-4 ring-orange-500" : ""
-                } ${isTrap ? "ring-4 ring-black" : ""} ${
-                  isPending ? "ring-4 ring-red-500 scale-[1.03]" : ""
                 }`}
               >
-                <div className="w-full aspect-square bg-neutral-200 flex items-center justify-center">
+                <div
+                  className={`w-full aspect-square flex items-center justify-center transition ${avatarBg}`}
+                >
                   <img
                     src={character.imageUrl}
                     alt={character.name}
