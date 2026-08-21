@@ -1,9 +1,8 @@
-import { use, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useUser } from "../context/userContext";
 import { socket } from "../socket";
 import Chat from "../components/Chat";
-import { userGame } from "../context/gameContext";
 
 interface Player {
   id: string;
@@ -70,8 +69,6 @@ function LobbyPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     });
-
-    const emptySlots = Math.max(0, MAX_PLAYERS - 1 - players.length);
   }
 
   const emptySlots = Math.max(0, MAX_PLAYERS - 1 - players.length);

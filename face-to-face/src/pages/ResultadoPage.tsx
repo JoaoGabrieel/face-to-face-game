@@ -1,4 +1,3 @@
-import { useNavigate } from "react-router-dom";
 import { userGame } from "../context/gameContext";
 import { socket } from "../socket";
 import { useParams } from "react-router-dom";
@@ -6,7 +5,6 @@ import { useParams } from "react-router-dom";
 function ResultadoPage() {
   const { roomId } = useParams<{ roomId: string }>();
   const { gameView, resetGame } = userGame();
-  const navigate = useNavigate();
 
   if (!gameView) {
     return (

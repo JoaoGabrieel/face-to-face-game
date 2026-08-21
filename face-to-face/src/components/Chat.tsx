@@ -1,4 +1,4 @@
-import { use, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { socket } from "../socket";
 
 interface ChatMessage {
