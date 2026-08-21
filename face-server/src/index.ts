@@ -25,7 +25,17 @@ function isHost(roomId: string, socketId: string): boolean {
 
 const io = new Server(server, {
   cors: {
-    origin: "https://face-to-face-game-t8yb.vercel.app",
+    origin: (origin, callback) => {
+      if (
+        !origin ||
+        origin === "http://localhost:5173" ||
+        /^https:\/\/face-to-face-game.*\.vercel\.app$/.test(origin)
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     methods: ["GET", "POST"],
   },
 });
