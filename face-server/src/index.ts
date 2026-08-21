@@ -25,7 +25,7 @@ function isHost(roomId: string, socketId: string): boolean {
 
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: "https://face-to-face-game-t8yb.vercel.app/",
     methods: ["GET", "POST"],
   },
 });
