@@ -28,10 +28,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
 
     socket.on("game-update", onGameUpdate);
-    socket.on("game-return-to-lobby", onReturnToLobby);
+    socket.on("return-to-lobby", onReturnToLobby);
     return () => {
       socket.off("game-update", onGameUpdate);
-      socket.off("game-return-to-lobby", onReturnToLobby);
+      socket.off("return-to-lobby", onReturnToLobby);
     };
   }, []);
   return (

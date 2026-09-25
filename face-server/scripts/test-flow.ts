@@ -3,128 +3,156 @@ import { io } from "socket.io-client";
 const ROOM_ID = "test-room-" + Date.now();
 const SERVER_URL = "http://localhost:3001";
 
-const player1 = io(SERVER_URL);
-const player2 = io(SERVER_URL);
+const p1 = io(SERVER_URL);
+const p2 = io(SERVER_URL);
+const p3 = io(SERVER_URL);
 
-function log(who: string, event: string, data: unknown) {
-  console.log(`[${who}] ${event}:`, JSON.stringify(data));
+function log(who: string, data: unknown) {
+  console.log(`[${who}]`, JSON.stringify(data));
 }
 
-let p1Secret = "";
-let p2CoringaId = "";
-let lastCharacters: { id: string }[] = [];
-let round = 0;
-let p2PassCount = 0;
+const chosenCoringa: Record<string, boolean> = {};
+const secrets: Record<string, string> = {};
+let charactersList: any[] = [];
+let started = false;
 
-function startRound(n: number) {
-  round = n;
-  p2PassCount = 0;
-  console.log(`\n========== RODADA ${n} ==========\n`);
-  player1.emit("start-game", { roomId: ROOM_ID });
+function joinAll() {
+  p1.emit("join-room", { roomId: ROOM_ID, username: "P1" });
+  setTimeout(
+    () => p2.emit("join-room", { roomId: ROOM_ID, username: "P2" }),
+    100,
+  );
+  setTimeout(
+    () => p3.emit("join-room", { roomId: ROOM_ID, username: "P3" }),
+    200,
+  );
 }
 
-player1.on("connect", () => {
-  player1.emit("join-room", { roomId: ROOM_ID, username: "Jogador1" });
+p1.on("connect", () => console.log("P1 conectado:", p1.id));
+p2.on("connect", () => console.log("P2 conectado:", p2.id));
+p3.on("connect", () => {
+  console.log("P3 conectado:", p3.id);
+  joinAll();
+  setTimeout(() => {
+    console.log("\n--- select-mode + start-game ---\n");
+    p1.emit("select-mode", { roomId: ROOM_ID, mode: "normal" });
+    setTimeout(() => p1.emit("start-game", { roomId: ROOM_ID }), 300);
+  }, 500);
 });
 
-player2.on("connect", () => {
-  player2.emit("join-room", { roomId: ROOM_ID, username: "Jogador2" });
-  setTimeout(() => startRound(1), 500);
-});
+function handleUpdate(who: string, socket: typeof p1, view: any) {
+  if (view.characters) {
+    charactersList = view.characters;
+  }
 
-player1.on("debug-secret", ({ secret }: { secret: string }) => {
-  p1Secret = secret;
-  console.log("P1 secret recebido:", secret);
-  tryFinalAnswer();
-});
-
-let p1Chose = false;
-let p2Chose = false;
-
-player1.on("game-update", (view) => {
-  log("P1", "game-update", {
+  log(who, {
     phase: view.phase,
     currentTurn: view.currentTurn,
-    myCoringaId: view.myCoringaId,
-    winnerId: view.winnerId,
+    isMyTurn: view.isMyTurn,
+    isResponder: view.isResponder,
+    isActive: view.isActive,
+    myResult: view.myResult,
     extraQuestions: view.extraQuestions,
+    winners: view.winners,
+    losers: view.losers,
   });
 
-  lastCharacters = view.characters;
-
-  if (view.phase === "choosing-coringa" && !p1Chose) {
-    p1Chose = true;
-    player1.emit("choose-coringa", {
-      roomId: ROOM_ID,
-      characterId: view.characters[0].id,
-    });
+  if (view.phase === "choosing-coringa" && !chosenCoringa[who]) {
+    chosenCoringa[who] = true;
+    const idx = who === "P1" ? 0 : who === "P2" ? 5 : 10;
+    socket.emit("choose-coringa", { characterId: view.characters[idx].id });
   }
 
-  if (view.phase === "playing" && !p1Secret) {
-    player1.emit("debug-get-secret", { roomId: ROOM_ID });
+  if (view.phase === "playing" && !secrets[who]) {
+    socket.emit("debug-get-secret");
   }
+}
 
+p1.on("game-update", (v) => handleUpdate("P1", p1, v));
+p2.on("game-update", (v) => handleUpdate("P2", p2, v));
+p3.on("game-update", (v) => handleUpdate("P3", p3, v));
+
+p1.on("debug-secret", ({ secret }) => {
+  secrets.P1 = secret;
+  console.log("P1 secret:", secret);
+  runStep1();
+});
+p2.on("debug-secret", ({ secret }) => {
+  secrets.P2 = secret;
+  console.log("P2 secret:", secret);
+});
+p3.on("debug-secret", ({ secret }) => {
+  secrets.P3 = secret;
+  console.log("P3 secret:", secret);
+});
+
+let step1Done = false;
+function runStep1() {
+  if (step1Done || !secrets.P1 || charactersList.length === 0) return;
+  step1Done = true;
+
+  setTimeout(() => {
+    console.log("\n--- PASSO 1: P1 responde ERRADO ---\n");
+    const wrong = charactersList.find((c) => c.id !== secrets.P1);
+    p1.emit("final-answer", { characterId: wrong.id });
+  }, 800);
+}
+
+// Passo 2: quando o turno chegar em P2, ele acerta a própria resposta (vence)
+p2.on("game-update", (view) => {
   if (
     view.phase === "playing" &&
-    view.currentTurn === player2.id &&
-    round === 3 &&
-    p2PassCount < 2
+    view.isMyTurn &&
+    secrets.P2 &&
+    view.myResult === null &&
+    !(p2 as any)._step2Done
   ) {
-    p2PassCount++;
+    (p2 as any)._step2Done = true;
     setTimeout(() => {
-      console.log(`P2 passando a vez (${p2PassCount}/2)`);
-      player2.emit("pass-turn", { roomId: ROOM_ID });
-    }, 300);
-  }
-
-  if (view.phase === "finished") {
-    console.log(
-      `RESULTADO rodada ${round}: winnerId = ${view.winnerId}, extraQuestions = ${view.extraQuestions}`,
-    );
-    p1Secret = "";
-    p1Chose = false;
-    p2Chose = false;
-    if (round < 3) setTimeout(() => startRound(round + 1), 500);
-    else setTimeout(() => process.exit(0), 1500);
+      console.log("\n--- PASSO 2: P2 responde CERTO (deve vencer) ---\n");
+      p2.emit("final-answer", { characterId: secrets.P2 });
+    }, 800);
   }
 });
 
-player2.on("game-update", (view) => {
-  log("P2", "game-update", {
-    phase: view.phase,
-    currentTurn: view.currentTurn,
-    myCoringaId: view.myCoringaId,
-    winnerId: view.winnerId,
-    extraQuestions: view.extraQuestions,
+// Passo 2.5: quando o turno chegar em P3, ele também acerta (vence)
+p3.on("game-update", (view) => {
+  if (
+    view.phase === "playing" &&
+    view.isMyTurn &&
+    secrets.P3 &&
+    view.myResult === null &&
+    !(p3 as any)._step25Done
+  ) {
+    (p3 as any)._step25Done = true;
+    setTimeout(() => {
+      console.log("\n--- PASSO 2.5: P3 responde CERTO (deve vencer) ---\n");
+      p3.emit("final-answer", { characterId: secrets.P3 });
+    }, 800);
+  }
+});
+
+// Passo 3: o último jogador ativo restante também dá a resposta certa
+function watchLastStanding(who: string, socket: typeof p1) {
+  socket.on("game-update", (view) => {
+    if (
+      view.phase === "playing" &&
+      view.isLastPlayerStanding &&
+      secrets[who] &&
+      !(socket as any)._step3Done
+    ) {
+      (socket as any)._step3Done = true;
+      setTimeout(() => {
+        console.log(`\n--- PASSO 3: ${who} é o último, responde CERTO ---\n`);
+        socket.emit("final-answer", { characterId: secrets[who] });
+      }, 800);
+    }
   });
-
-  if (view.phase === "choosing-coringa" && !p2Chose) {
-    p2Chose = true;
-    const characterId = view.characters[5].id;
-    p2CoringaId = characterId;
-    player2.emit("choose-coringa", { roomId: ROOM_ID, characterId });
-  }
-
-  if (view.phase === "playing" && view.currentTurn === player1.id) {
-    player2.emit("debug-get-secret", { roomId: ROOM_ID });
-  }
-});
-
-function tryFinalAnswer() {
-  if (round === 1) {
-    console.log("P1 respondendo CERTO (o próprio segredo)");
-    player1.emit("final-answer", { roomId: ROOM_ID, characterId: p1Secret });
-  } else if (round === 2) {
-    console.log("P1 respondendo o CORINGA do adversário");
-    player1.emit("final-answer", { roomId: ROOM_ID, characterId: p2CoringaId });
-  } else if (round === 3) {
-    const wrongOne = lastCharacters.find(
-      (c) => c.id !== p1Secret && c.id !== p2CoringaId,
-    );
-    console.log("P1 respondendo ERRADO (comum):", wrongOne!.id);
-    player1.emit("final-answer", {
-      roomId: ROOM_ID,
-      characterId: wrongOne!.id,
-    });
-  }
 }
+watchLastStanding("P1", p1);
+watchLastStanding("P3", p3);
+
+setTimeout(() => {
+  console.log("\nEncerrando teste.");
+  process.exit(0);
+}, 10000);
