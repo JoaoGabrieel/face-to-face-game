@@ -6,7 +6,6 @@ import DotGrid from "../components/DotGrid";
 function CoringaPage() {
   const { gameView } = userGame();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [step, setStep] = useState<"coringa" | "secreto">("coringa");
 
   if (!gameView) {
     return (
@@ -42,9 +41,6 @@ function CoringaPage() {
       socket.emit("choose-secret", { characterId: selectedId });
     }
     setSelectedId(null);
-    if (assignmentMode === "ambos" && currentStep === "coringa") {
-      setStep("secreto");
-    }
   }
 
   if (currentStep === "done") {

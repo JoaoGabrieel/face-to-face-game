@@ -20,6 +20,13 @@ function GamePage() {
   }, [gameView?.turnTimeRemaining, gameView?.turnTimerPaused]);
 
   useEffect(() => {
+    if (!gameView?.lastWrongAnswerAt) return;
+    setShowWrongToast(true);
+    const timer = setTimeout(() => setShowWrongToast(false), 3000);
+    return () => clearTimeout(timer);
+  }, [gameView?.lastWrongAnswerAt]);
+
+  useEffect(() => {
     if (
       !gameView ||
       gameView.turnTimeRemaining == null ||

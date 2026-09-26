@@ -5,7 +5,6 @@ import { socket } from "../socket";
 import Chat from "../components/Chat";
 import RulesButton from "../components/RulesButton";
 import DotGrid from "../components/DotGrid";
-import Button from "../components/Button";
 import CharacterCreator from "../components/CharacterCreator";
 
 interface Player {
