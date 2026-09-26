@@ -3,6 +3,7 @@ import type React from "react";
 import { socket } from "../socket";
 import { userGame } from "../context/gameContext";
 import TurnAnnouncer from "../components/TurnAnnouncer";
+import DotGrid from "../components/DotGrid";
 
 function GamePage() {
   const { gameView } = userGame();
@@ -165,7 +166,19 @@ function GamePage() {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6 bg-gradient-to-b from-[#9c1e40] via-[#d94f2b] to-[#f2941a] p-6 sm:p-10">
+    <div className="min-h-screen w-full flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6 bg-gradient-to-b from-[#9c1e40] via-[#d94f2b] to-[#f2941a] p-6 sm:p-10 relative overflow-hidden">
+      <div className="absolute inset-0 opacity-20 pointer-events-none">
+        <DotGrid
+          dotSize={4}
+          gap={28}
+          baseColor="#ffffff"
+          activeColor="#ffffff"
+          proximity={120}
+          shockRadius={0}
+          shockStrength={0}
+          speedTrigger={999999}
+        />
+      </div>
       <TurnAnnouncer
         currentTurn={gameView.currentTurn}
         turnPlayerUsername={gameView.turnPlayerUsername}
@@ -222,6 +235,9 @@ function GamePage() {
               <input
                 value={questionText}
                 onChange={(e) => setQuestionText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSubmitQuestion();
+                }}
                 placeholder="digite sua pergunta"
                 className="flex-1 rounded-full px-5 py-3 font-semibold text-neutral-800 placeholder-neutral-400 bg-white shadow-md outline-none focus:ring-4 focus:ring-yellow-400"
               />
@@ -244,6 +260,9 @@ function GamePage() {
             <input
               value={answerText}
               onChange={(e) => setAnswerText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSubmitAnswer();
+              }}
               placeholder="Digite uma dica"
               className="flex-1 rounded-full px-5 py-3 font-semibold text-neutral-800 placeholder-neutral-400 bg-white shadow-md outline-none focus:ring-4 focus:ring-yellow-400"
             />
@@ -268,14 +287,14 @@ function GamePage() {
         )}
 
         {isMyTurn && gameView.pendingAnswer && (
-          <div className="w-full bg-white/90 rounded-2xl px-5 py-3">
+          <div className="relative z-10 w-full bg-white rounded-2xl px-5 py-3">
             <p className="text-neutral-700 font-bold text-center">
               Resposta: {gameView.pendingAnswer}
             </p>
           </div>
         )}
 
-        <div className="w-full bg-black/10 rounded-3xl p-5">
+        <div className="relative z-10 w-full bg-[#6e1830] rounded-3xl p-5">
           <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
             {gameView.characters.map((character) => {
               const discarded = isDiscarded(character.id);
@@ -373,7 +392,7 @@ function GamePage() {
 
       {/* Painel lateral: jogadores + histórico */}
       <div className="w-full lg:w-72 flex flex-col gap-4 shrink-0">
-        <div className="bg-white/95 rounded-2xl p-4 shadow-lg">
+        <div className="relative z-10 bg-white rounded-2xl p-4 shadow-lg">
           <h3 className="font-extrabold text-neutral-700 text-sm mb-2">
             Jogadores
           </h3>

@@ -2,6 +2,7 @@ import { Character, generateRandomCharacter } from "./characters";
 import { nanoid } from "nanoid";
 
 export type GamePhase = "choosing-coringa" | "playing" | "finished";
+export type AssignmentMode = "coringa" | "secreto" | "ambos";
 
 export interface QuestionLogEntry {
   id: string;
@@ -35,6 +36,7 @@ export interface GameState {
   timeLimitSeconds: number | null;
   turnTimeRemaining: number | null;
   turnTimerPaused: boolean;
+  assignmentMode: AssignmentMode;
 }
 
 const games = new Map<string, GameState>();
@@ -45,6 +47,50 @@ function pickRandom<T>(array: T[]): T {
 
 function characterCountFor(playerCount: number): number {
   return Math.min(20 + (playerCount - 2) * 5, 40);
+}
+
+function isPhaseComplete(game: GameState): boolean {
+  const coringaDone = game.players.every(
+    (id) => game.coringaOf[id] !== undefined,
+  );
+  const secretDone = game.players.every(
+    (id) => game.secretCharacterOf[id] !== undefined,
+  );
+
+  if (game.assignmentMode === "coringa") return coringaDone;
+  if (game.assignmentMode === "secreto") return secretDone;
+  return coringaDone && secretDone;
+}
+
+export function setCoringa(
+  gameId: string,
+  playerId: string,
+  characterId: string,
+): GameState | undefined {
+  const game = games.get(gameId);
+  if (!game) return undefined;
+  if (game.phase !== "choosing-coringa") return game;
+  if (game.assignmentMode === "secreto") return game;
+
+  game.coringaOf[playerId] = characterId;
+  if (isPhaseComplete(game)) game.phase = "playing";
+  return game;
+}
+
+export function setSecret(
+  gameId: string,
+  playerId: string,
+  characterId: string,
+): GameState | undefined {
+  const game = games.get(gameId);
+  if (!game) return undefined;
+  if (game.phase !== "choosing-coringa") return game;
+  if (game.assignmentMode === "coringa") return game; // não usa segredo manual nesse modo
+
+  const target = game.targetOf[playerId];
+  game.secretCharacterOf[target] = characterId;
+  if (isPhaseComplete(game)) game.phase = "playing";
+  return game;
 }
 
 export function splitIntoChains<T extends { id: string; username: string }>(
@@ -58,6 +104,7 @@ export function createGame(
   chainPlayers: { id: string; username: string }[],
   customCharacter?: { name: string; imageUrl: string } | null,
   timeLimitSeconds?: number | null,
+  assignmentMode: AssignmentMode = "coringa",
 ): GameState {
   const n = chainPlayers.length;
   const gameId = nanoid(10);
@@ -73,8 +120,8 @@ export function createGame(
   }
 
   const playerIds = chainPlayers.map((p) => p.id);
-
   const secretCharacterOf: Record<string, string> = {};
+  const coringaOf: Record<string, string> = {};
   const targetOf: Record<string, string> = {};
   const responderOf: Record<string, string> = {};
   const usernames: Record<string, string> = {};
@@ -82,13 +129,22 @@ export function createGame(
   const selectedBy: Record<string, string[]> = {};
 
   chainPlayers.forEach((p, i) => {
-    secretCharacterOf[p.id] = pickRandom(characters).id;
     usernames[p.id] = p.username;
     eliminatedBy[p.id] = [];
     selectedBy[p.id] = [];
     targetOf[p.id] = playerIds[(i + 1) % n];
     responderOf[p.id] = playerIds[(i - 1 + n) % n];
   });
+
+  if (assignmentMode == "coringa") {
+    playerIds.forEach((id) => {
+      secretCharacterOf[id] = pickRandom(characters).id;
+    });
+  } else if (assignmentMode === "secreto") {
+    playerIds.forEach((id) => {
+      coringaOf[id] = pickRandom(characters).id;
+    });
+  }
 
   const game: GameState = {
     roomId,
@@ -98,7 +154,7 @@ export function createGame(
     activePlayers: [...playerIds],
     characters,
     secretCharacterOf,
-    coringaOf: {},
+    coringaOf,
     targetOf,
     responderOf,
     eliminatedBy,
@@ -114,28 +170,10 @@ export function createGame(
     timeLimitSeconds: timeLimitSeconds ?? null,
     turnTimeRemaining: timeLimitSeconds ?? null,
     turnTimerPaused: false,
+    assignmentMode,
   };
 
   games.set(gameId, game);
-  return game;
-}
-
-export function setCoringa(
-  gameId: string,
-  playerId: string,
-  characterId: string,
-): GameState | undefined {
-  const game = games.get(gameId);
-  if (!game) return undefined;
-  if (game.phase !== "choosing-coringa") return game;
-
-  game.coringaOf[playerId] = characterId;
-
-  const allChose = game.players.every((id) => game.coringaOf[id] !== undefined);
-  if (allChose) {
-    game.phase = "playing";
-  }
-
   return game;
 }
 

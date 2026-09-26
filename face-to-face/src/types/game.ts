@@ -5,6 +5,7 @@ export interface Character {
 }
 
 export type GamePhase = "choosing-coringa" | "playing" | "finished";
+export type AssignmentMode = "coringa" | "secreto" | "ambos";
 
 export interface PlayerInfo {
   id: string;
@@ -60,4 +61,7 @@ export interface GameView {
   timeLimitSeconds: number | null;
   turnTimeRemaining: number | null;
   turnTimerPaused: boolean;
+  assignmentMode: AssignmentMode;
+  myCoringaChosen: boolean;
+  mySecretChosen: boolean;
 }

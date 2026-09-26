@@ -13,6 +13,7 @@ import {
   GameState,
 } from "./game/gameState";
 import { nanoid } from "nanoid";
+import { setSecret } from "./game/gameState";
 
 const app = express();
 app.use(cors());
@@ -22,6 +23,7 @@ const server = http.createServer(app);
 const roomModes = new Map<string, string | null>();
 const playerToGame = new Map<string, string>(); // socketId -> gameId
 const roomTimeLimits = new Map<string, number | null>();
+const roomAssignmentModes = new Map<string, "coringa" | "secreto" | "ambos">();
 
 const gameTimers = new Map<
   string,
@@ -173,7 +175,7 @@ function buildPlayerView(game: GameState, forPlayerId: string) {
     })),
     opponentSecretCharacterId: game.secretCharacterOf[target] ?? null,
     myCoringaId: game.coringaOf[forPlayerId] ?? null,
-    myPoisonCharacterId: game.coringaOf[responder] ?? null,
+    myPoisonCharacterId: game.coringaOf[forPlayerId] ?? null,
     myEliminated: game.eliminatedBy[forPlayerId] ?? [],
     mySelected: game.selectedBy[forPlayerId] ?? [],
     turnPlayerEliminated: game.eliminatedBy[turnPlayerId] ?? [],
@@ -197,6 +199,10 @@ function buildPlayerView(game: GameState, forPlayerId: string) {
     timeLimitSeconds: game.timeLimitSeconds,
     turnTimeRemaining: game.turnTimeRemaining,
     turnTimerPaused: game.turnTimerPaused,
+    assignmentMode: game.assignmentMode,
+    myCoringaChosen: game.coringaOf[forPlayerId] !== undefined,
+    mySecretChosen:
+      game.secretCharacterOf[game.targetOf[forPlayerId]] !== undefined,
   };
 }
 
@@ -245,6 +251,7 @@ io.on("connection", (socket: Socket) => {
         chainPlayers,
         customCharacters.get(roomId),
         roomTimeLimits.get(roomId),
+        roomAssignmentModes.get(roomId) ?? "coringa",
       );
       resetGameTimerForNewTurn(game);
       chainPlayers.forEach((p) => {
@@ -276,10 +283,34 @@ io.on("connection", (socket: Socket) => {
     roomModes.delete(roomId);
   });
 
+  socket.on(
+    "select-assignment-mode",
+    ({
+      roomId,
+      mode,
+    }: {
+      roomId: string;
+      mode: "coringa" | "secreto" | "ambos";
+    }) => {
+      if (!isHost(roomId, socket.id)) return;
+      roomAssignmentModes.set(roomId, mode);
+      io.to(roomId).emit("assignment-mode-update", mode);
+    },
+  );
+
   socket.on("choose-coringa", ({ characterId }: { characterId: string }) => {
     const game = getGameForSocket(socket.id);
     if (!game) return;
     const updated = setCoringa(game.gameId, socket.id, characterId);
+    if (!updated) return;
+    resetGameTimerForNewTurn(updated);
+    broadcastGameUpdate(updated);
+  });
+
+  socket.on("choose-secret", ({ characterId }: { characterId: string }) => {
+    const game = getGameForSocket(socket.id);
+    if (!game) return;
+    const updated = setSecret(game.gameId, socket.id, characterId);
     if (!updated) return;
     resetGameTimerForNewTurn(updated);
     broadcastGameUpdate(updated);
@@ -498,6 +529,17 @@ io.on("connection", (socket: Socket) => {
     const responderId = game.responderOf[socket.id];
     const myPoison =
       responderId !== socket.id ? game.coringaOf[responderId] : undefined;
+
+    console.log("DEBUG final-answer:", {
+      assignmentMode: game.assignmentMode,
+      socketId: socket.id,
+      characterId,
+      mySecret,
+      responderId,
+      myPoison,
+      fullCoringaOf: game.coringaOf,
+      fullResponderOf: game.responderOf,
+    });
 
     if (myPoison && characterId === myPoison) {
       const updated = eliminatePlayer(game.gameId, socket.id, "lost");

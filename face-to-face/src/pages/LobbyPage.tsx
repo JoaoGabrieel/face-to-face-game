@@ -25,6 +25,9 @@ function LobbyPage() {
   const hasJoined = useRef(false);
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
   const [timeLimit, setTimeLimit] = useState<number | null>(null);
+  const [assignmentMode, setAssignmentMode] = useState<
+    "coringa" | "secreto" | "ambos"
+  >("coringa");
   const [customCharacter, setCustomCharacter] = useState<{
     name: string;
     imageUrl: string;
@@ -64,6 +67,12 @@ function LobbyPage() {
       setTimeLimit(seconds);
     }
 
+    function onAssignmentModeUpdate(mode: "coringa" | "secreto" | "ambos") {
+      setAssignmentMode(mode);
+    }
+
+    socket.on("assignment-mode-update", onAssignmentModeUpdate);
+
     socket.on("time-limit-update", onTimeLimitUpdate);
     socket.on("custom-character-update", onCustomCharacterUpdate);
 
@@ -74,6 +83,7 @@ function LobbyPage() {
       socket.off("players-update", onPlayersUpdate);
       socket.off("mode-update", onModeUpdate);
       socket.off("custom-character-update", onCustomCharacterUpdate);
+      socket.off("assignment-mode-update", onAssignmentModeUpdate);
     };
   }, [roomId, username, navigate]);
 
@@ -113,6 +123,11 @@ function LobbyPage() {
   function handleSelectTimeLimit(seconds: number | null) {
     if (!isHost || !roomId) return;
     socket.emit("select-time-limit", { roomId, seconds });
+  }
+
+  function handleSelectAssignmentMode(mode: "coringa" | "secreto" | "ambos") {
+    if (!isHost || !roomId) return;
+    socket.emit("select-assignment-mode", { roomId, mode });
   }
 
   const emptySlots = Math.max(0, MAX_PLAYERS - 1 - players.length);
@@ -248,6 +263,8 @@ function LobbyPage() {
           onSave={handleSaveCharacter}
           timeLimit={timeLimit}
           onSelectTimeLimit={handleSelectTimeLimit}
+          assignmentMode={assignmentMode}
+          onSelectAssignmentMode={handleSelectAssignmentMode}
         />
       )}
     </div>

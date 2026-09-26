@@ -82,6 +82,8 @@ interface CharacterCreatorProps {
   onCancel: () => void;
   timeLimit: number | null;
   onSelectTimeLimit: (seconds: number | null) => void;
+  assignmentMode: "coringa" | "secreto" | "ambos";
+  onSelectAssignmentMode: (mode: "coringa" | "secreto" | "ambos") => void;
 }
 
 function Selector({
@@ -126,6 +128,8 @@ function CharacterCreator({
   onCancel,
   timeLimit,
   onSelectTimeLimit,
+  assignmentMode,
+  onSelectAssignmentMode,
 }: CharacterCreatorProps) {
   const [name, setName] = useState("");
   const [topIdx, setTopIdx] = useState(0);
@@ -247,12 +251,43 @@ function CharacterCreator({
           </div>
         </div>
 
+        <div className="w-full h-px bg-white/20" />
+
+        <div className="w-full flex flex-col gap-3">
+          <p className="text-white font-extrabold text-sm uppercase tracking-wide text-center">
+            Quem escolhe o quê
+          </p>
+          <div className="flex gap-3 justify-center flex-wrap">
+            {[
+              { label: "Só Coringa", value: "coringa" as const },
+              { label: "Só Segredo", value: "secreto" as const },
+              { label: "Ambos", value: "ambos" as const },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => onSelectAssignmentMode(opt.value)}
+                className={`px-5 py-2 rounded-full font-bold text-sm border-b-4 transition-all ${
+                  assignmentMode === opt.value
+                    ? "bg-yellow-400 text-neutral-800 border-yellow-600"
+                    : "bg-white/80 text-neutral-800 border-neutral-300"
+                } cursor-pointer hover:brightness-95 active:border-b-0 active:translate-y-1`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-white/60 text-xs text-center">
+            Define se quem responde por você escolhe sua armadilha, seu segredo,
+            ou os dois.
+          </p>
+        </div>
+
         <div className="flex gap-4 w-full">
           <button
             onClick={onCancel}
             className="flex-1 h-14 rounded-2xl font-extrabold bg-white/50 text-neutral-800 border-b-4 border-white/30 active:border-b-0 active:translate-y-1 transition-all"
           >
-            Cancelar
+            Fechar
           </button>
           <button
             onClick={handleSave}

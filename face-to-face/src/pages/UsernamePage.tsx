@@ -1,13 +1,22 @@
-import { useState, type KeyboardEvent } from "react";
+import { useState, useEffect, type KeyboardEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { nanoid } from "nanoid/non-secure";
 import { useUser } from "../context/userContext";
 
 function UsernamePage() {
   const [name, setName] = useState("");
+  const [avatarSeed, setAvatarSeed] = useState("preview");
   const navigate = useNavigate();
   const { setUsername } = useUser();
   const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const trimmed = name.trim();
+    const timer = setTimeout(() => {
+      setAvatarSeed(trimmed || "preview");
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [name]);
 
   function handleSubmit() {
     const trimmed = name.trim();
@@ -31,7 +40,13 @@ function UsernamePage() {
     <div className="min-h-screen w-full flex items-center justify-center p-6 bg-gradient-to-b from-[#9c1e40] via-[#d94f2b] to-[#f2941a]">
       <div className="flex flex-col sm:flex-row w-full max-w-[700px] min-h-[420px] rounded-3xl overflow-hidden shadow-2xl">
         <div className="flex-1 flex items-center justify-center bg-gradient-to-b from-[#c9633f] to-[#f2941a] py-10 sm:py-0">
-          <div className="w-24 h-24 sm:w-[45%] sm:h-auto sm:aspect-square rounded-full bg-[#d9d9d9] shadow-inner" />
+          <div className="w-24 h-24 sm:w-[45%] sm:h-auto sm:aspect-square rounded-full bg-[#d9d9d9] shadow-inner overflow-hidden">
+            <img
+              src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(avatarSeed)}`}
+              alt="Preview do avatar"
+              className="w-full h-full object-cover"
+            />
+          </div>
         </div>
         <div className="flex-1 bg-white flex flex-col items-center justify-center gap-7 p-8">
           <h1 className="text-xl sm:text-2xl font-extrabold text-neutral-900 text-center m-0">
