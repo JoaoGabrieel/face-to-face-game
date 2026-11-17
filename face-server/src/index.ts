@@ -106,7 +106,7 @@ function pauseGameTimer(game: GameState) {
     clearTimeout(t.timeoutHandle);
     const elapsedMs = Date.now() - t.startedAt;
     game.turnTimeRemaining = Math.max(
-      0,
+      1,
       Math.round((game.turnTimeRemaining * 1000 - elapsedMs) / 1000),
     );
     gameTimers.delete(game.gameId);
@@ -127,7 +127,9 @@ function resetGameTimerForNewTurn(game: GameState) {
 
 function handleTurnTimeout(gameId: string) {
   const game = getGame(gameId);
+
   if (!game || game.phase !== "playing") return;
+  if (game.turnTimerPaused) return;
   gameTimers.delete(gameId);
 
   game.currentTurn = getNextActivePlayer(game);
@@ -153,10 +155,13 @@ function buildPlayerView(game: GameState, forPlayerId: string) {
 
   const revealBoards =
     game.phase === "finished"
-      ? game.players.map((id) => ({
+      ? game.players.map((id, i) => ({
           playerId: id,
           username: game.usernames[id],
           secretCharacterId: game.secretCharacterOf[id],
+          coringaId: game.coringaOf[id] ?? null,
+          coringaTargetUsername:
+            game.usernames[game.players[(i + 1) % game.players.length]],
           eliminated: game.eliminatedBy[id] ?? [],
           selected: game.selectedBy[id] ?? [],
           result: game.playerResults[id] ?? null,
@@ -203,6 +208,21 @@ function buildPlayerView(game: GameState, forPlayerId: string) {
     myCoringaChosen: game.coringaOf[forPlayerId] !== undefined,
     mySecretChosen:
       game.secretCharacterOf[game.targetOf[forPlayerId]] !== undefined,
+    turnResponderUsername: game.usernames[turnResponder],
+    turnPlayerSecretId:
+      forPlayerId !== turnPlayerId
+        ? (game.secretCharacterOf[turnPlayerId] ?? null)
+        : null,
+    turnPlayerPoisonId:
+      forPlayerId !== turnPlayerId
+        ? (game.coringaOf[turnResponder] ?? null)
+        : null,
+    skippedPlayers: game.players
+      .filter(
+        (id) => game.skipNextTurn?.[id] && game.activePlayers.includes(id),
+      )
+      .map((id) => game.usernames[id]),
+    lastWrongPlayer: game.lastWrongPlayer,
   };
 }
 
@@ -440,6 +460,7 @@ io.on("connection", (socket: Socket) => {
     const game = getGameForSocket(socket.id);
     if (!game || game.phase !== "playing") return;
     if (socket.id !== game.currentTurn) return;
+    if (game.pendingQuestion && !game.pendingAnswer) return;
 
     game.currentTurn = getNextActivePlayer(game);
     game.extraQuestions = 0;
@@ -456,10 +477,6 @@ io.on("connection", (socket: Socket) => {
     if (socket.id !== game.currentTurn) return;
     if (game.responderOf[socket.id] === socket.id) return;
     if (!question.trim()) return;
-
-    if (game.extraQuestions > 0) {
-      game.extraQuestions -= 1;
-    }
 
     game.questionLog.push({
       id: nanoid(8),
@@ -487,6 +504,12 @@ io.on("connection", (socket: Socket) => {
       lastEntry.answer = answer.trim();
     }
     game.pendingAnswer = answer.trim();
+    console.log("SUBMIT-ANSWER:", {
+      currentTurn: game.currentTurn,
+      responder: socket.id,
+      timeRemaining: game.turnTimeRemaining,
+      paused: game.turnTimerPaused,
+    });
     resumeGameTimer(game);
     broadcastGameUpdate(game);
   });
@@ -514,16 +537,17 @@ io.on("connection", (socket: Socket) => {
     io.to(roomId).emit("custom-character-update", null);
   });
 
-  socket.on("debug-get-secret", () => {
-    const game = getGameForSocket(socket.id);
-    if (!game) return;
-    socket.emit("debug-secret", { secret: game.secretCharacterOf[socket.id] });
-  });
+  // socket.on("debug-get-secret", () => {
+  //   const game = getGameForSocket(socket.id);
+  //   if (!game) return;
+  //   socket.emit("debug-secret", { secret: game.secretCharacterOf[socket.id] });
+  // });
 
   socket.on("final-answer", ({ characterId }: { characterId: string }) => {
     const game = getGameForSocket(socket.id);
     if (!game || game.phase !== "playing") return;
     if (socket.id !== game.currentTurn) return;
+    if (game.pendingQuestion && !game.pendingAnswer) return;
 
     const mySecret = game.secretCharacterOf[socket.id];
     const responderId = game.responderOf[socket.id];
@@ -566,6 +590,14 @@ io.on("connection", (socket: Socket) => {
     game.pendingQuestion = null;
     game.pendingAnswer = null;
     game.lastWrongAnswer = Date.now();
+    game.skipNextTurn = game.skipNextTurn ?? {};
+    game.skipNextTurn[socket.id] = true;
+    game.lastWrongAnswer = Date.now();
+    game.lastWrongPlayer = game.usernames[socket.id];
+    game.pendingQuestion = null;
+    game.pendingAnswer = null;
+    game.currentTurn = getNextActivePlayer(game);
+    resetGameTimerForNewTurn(game);
     broadcastGameUpdate(game);
   });
 });

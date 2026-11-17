@@ -23,7 +23,7 @@ const sections = [
   {
     title: "✅ Resposta Final",
     content:
-      "Acertou seu segredo? Você vence! Errou (sem cair no coringa)? Nada perdido, mas o adversário ganha 2 perguntas extras seguidas.Voce tem a visão do personagem que seu adversario deve acertar ele ficara marcado com a cor Laranja.",
+      "Acertou seu segredo? Você vence! Errou (sem cair no coringa)? Você perde a sua próxima vez de jogar.",
   },
 
   {

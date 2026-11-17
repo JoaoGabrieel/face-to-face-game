@@ -37,6 +37,8 @@ export interface GameState {
   turnTimeRemaining: number | null;
   turnTimerPaused: boolean;
   assignmentMode: AssignmentMode;
+  skipNextTurn?: Record<string, boolean>;
+  lastWrongPlayer: string | null;
 }
 
 const games = new Map<string, GameState>();
@@ -68,6 +70,10 @@ export function setCoringa(
   characterId: string,
 ): GameState | undefined {
   const game = games.get(gameId);
+  const secretOfTarget = game?.secretCharacterOf[game?.targetOf[playerId]];
+  if (secretOfTarget === characterId) return game;
+
+  if (game?.coringaOf[playerId] === characterId) return game;
   if (!game) return undefined;
   if (game.phase !== "choosing-coringa") return game;
   if (game.assignmentMode === "secreto") return game;
@@ -171,6 +177,8 @@ export function createGame(
     turnTimeRemaining: timeLimitSeconds ?? null,
     turnTimerPaused: false,
     assignmentMode,
+    skipNextTurn: {},
+    lastWrongPlayer: null,
   };
 
   games.set(gameId, game);
@@ -183,11 +191,20 @@ function advanceTurnFrom(game: GameState, fromPlayerId: string): string {
     ...game.players.slice(idx + 1),
     ...game.players.slice(0, idx + 1),
   ];
-  return (
-    rotated.find(
-      (id) => game.activePlayers.includes(id) && id !== fromPlayerId,
-    ) ?? fromPlayerId
+  const candidates = rotated.filter(
+    (id) => game.activePlayers.includes(id) && id !== fromPlayerId,
   );
+
+  for (const id of candidates) {
+    if (game.skipNextTurn?.[id]) {
+      game.skipNextTurn[id] = false;
+      continue;
+    }
+    return id;
+  }
+
+  if (game.activePlayers.includes(fromPlayerId)) return fromPlayerId;
+  return candidates[0];
 }
 
 export function getNextActivePlayer(game: GameState): string {

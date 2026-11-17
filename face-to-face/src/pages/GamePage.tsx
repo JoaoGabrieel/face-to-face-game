@@ -48,6 +48,7 @@ function GamePage() {
   }
 
   const { isMyTurn, isResponder, isActive } = gameView;
+  const waitingAnswer = !!gameView.pendingQuestion && !gameView.pendingAnswer;
 
   function handlePassTurn() {
     socket.emit("pass-turn", {});
@@ -93,11 +94,11 @@ function GamePage() {
   }
 
   function isTargetHint(characterId: string) {
-    return isResponder && characterId === gameView!.opponentSecretCharacterId;
+    return characterId === gameView!.turnPlayerSecretId;
   }
 
   function isTrapHint(characterId: string) {
-    return isResponder && characterId === gameView!.myPoisonCharacterId;
+    return characterId === gameView!.turnPlayerPoisonId;
   }
 
   function handleSubmitQuestion() {
@@ -193,8 +194,8 @@ function GamePage() {
       />
       {showWrongToast && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 bg-red-600 text-white font-extrabold px-6 py-3 rounded-xl z-[100] shadow-lg animate-pulse">
-          ❌ Resposta errada! {isMyTurn ? "Você ganhou" : "Alguém ganhou"} 2
-          perguntas extras!
+          ❌ {gameView.lastWrongPlayer} errou a resposta perde a vez na proxima
+          rodada!
         </div>
       )}
 
@@ -214,6 +215,14 @@ function GamePage() {
           </div>
         </div>
 
+        <div className="w-full text-center text-white font-bold text-sm bg-[#6e1830] rounded-xl py-2 px-4">
+          {gameView.pendingQuestion && !gameView.pendingAnswer
+            ? isResponder
+              ? "🎤 É com você: responda a pergunta!"
+              : `🎤 Aguardando ${gameView.turnResponderUsername} responder...`
+            : `🎤 Quem responde por ${isMyTurn ? "você" : gameView.turnPlayerUsername}: ${gameView.turnResponderUsername}`}
+        </div>
+
         {gameView.timeLimitSeconds !== null && displaySeconds !== null && (
           <div
             className={`w-full rounded-xl py-2 text-center font-extrabold text-sm ${
@@ -227,40 +236,38 @@ function GamePage() {
             {gameView.turnTimerPaused && " (pausado)"}
           </div>
         )}
-        {gameView.extraQuestions > 0 && (
-          <div className="w-full bg-yellow-300/90 text-neutral-800 font-bold text-center rounded-xl py-2 text-sm">
-            {isMyTurn
-              ? `Você tem ${gameView.extraQuestions} pergunta(s) extra`
-              : `${gameView.turnPlayerUsername} tem ${gameView.extraQuestions} pergunta(s) extra`}
+        {gameView.skippedPlayers.length > 0 && (
+          <div className="relative z-10 w-full bg-yellow-300 text-neutral-800 font-bold text-center rounded-xl py-2 text-sm">
+            ⏭ {gameView.skippedPlayers.join(", ")}{" "}
+            {gameView.skippedPlayers.length > 1 ? "perdem" : "perde"} a próxima
+            vez
           </div>
         )}
 
-        {isMyTurn &&
-          (!gameView.pendingQuestion ||
-            (gameView.pendingAnswer && gameView.extraQuestions > 0)) && (
-            <div className="w-full flex gap-2">
-              <input
-                value={questionText}
-                onChange={(e) => setQuestionText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSubmitQuestion();
-                }}
-                placeholder="digite sua pergunta"
-                className="flex-1 rounded-full px-5 py-3 font-semibold text-neutral-800 placeholder-neutral-400 bg-white shadow-md outline-none focus:ring-4 focus:ring-yellow-400"
-              />
-              <button
-                onClick={handleSubmitQuestion}
-                disabled={!questionText.trim()}
-                className={`rounded-full px-6 font-extrabold shadow-md transition ${
-                  questionText.trim()
-                    ? "bg-white text-neutral-800 cursor-pointer hover:brightness-95"
-                    : "bg-white/50 text-neutral-500 cursor-not-allowed"
-                }`}
-              >
-                Enviar
-              </button>
-            </div>
-          )}
+        {isMyTurn && !gameView.pendingQuestion && (
+          <div className="w-full flex gap-2">
+            <input
+              value={questionText}
+              onChange={(e) => setQuestionText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSubmitQuestion();
+              }}
+              placeholder="digite sua pergunta"
+              className="flex-1 rounded-full px-5 py-3 font-semibold text-neutral-800 placeholder-neutral-400 bg-white shadow-md outline-none focus:ring-4 focus:ring-yellow-400"
+            />
+            <button
+              onClick={handleSubmitQuestion}
+              disabled={!questionText.trim()}
+              className={`rounded-full px-6 font-extrabold shadow-md transition ${
+                questionText.trim()
+                  ? "bg-white text-neutral-800 cursor-pointer hover:brightness-95"
+                  : "bg-white/50 text-neutral-500 cursor-not-allowed"
+              }`}
+            >
+              Enviar
+            </button>
+          </div>
+        )}
 
         {isResponder && gameView.pendingQuestion && !gameView.pendingAnswer && (
           <div className="w-full flex gap-2">
@@ -301,6 +308,19 @@ function GamePage() {
           </div>
         )}
 
+        {!isMyTurn && (
+          <div className="relative z-10 w-full flex flex-wrap gap-4 justify-center bg-[#6e1830] rounded-2xl px-4 py-2 text-xs font-bold text-white">
+            <span className="flex items-center gap-2">
+              <span className="w-4 h-4 rounded bg-orange-500 inline-block" />
+              🎯 Segredo de {gameView.turnPlayerUsername}
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="w-4 h-4 rounded bg-neutral-900 border border-white/40 inline-block" />
+              ☠️ Coringa (se apontar, perde)
+            </span>
+          </div>
+        )}
+
         <div className="relative z-10 w-full bg-[#6e1830] rounded-3xl p-5">
           <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
             {gameView.characters.map((character) => {
@@ -331,13 +351,19 @@ function GamePage() {
                   }`}
                 >
                   <div
-                    className={`w-full aspect-square flex items-center justify-center transition ${avatarBg}`}
+                    className={`relative w-full aspect-square flex items-center justify-center transition ${avatarBg}`}
                   >
                     <img
                       src={character.imageUrl}
                       alt={character.name}
                       className="w-full h-full object-cover"
                     />
+                    {isTarget && (
+                      <span className="absolute top-1 right-1 text-lg">🎯</span>
+                    )}
+                    {isTrap && (
+                      <span className="absolute top-1 right-1 text-lg">☠️</span>
+                    )}
                   </div>
                   <div className="w-full bg-white py-1.5">
                     <span className="text-xs font-bold text-neutral-700 block text-center truncate px-1">
@@ -351,16 +377,26 @@ function GamePage() {
         </div>
 
         {isMyTurn && !finalAnswerMode && (
-          <div className="flex gap-4 w-full max-w-md">
+          <div className="sticky bottom-4 z-20 flex gap-4 w-full max-w-md bg-[#6e1830] rounded-2xl p-3 shadow-2xl">
             <button
               onClick={handlePassTurn}
-              className="flex-1 h-14 rounded-2xl font-extrabold bg-white/85 text-neutral-800 cursor-pointer hover:brightness-95"
+              disabled={waitingAnswer}
+              className={`flex-1 h-14 rounded-2xl font-extrabold bg-white/85 text-neutral-800 ${
+                waitingAnswer
+                  ? "opacity-50 cursor-not-allowed"
+                  : "cursor-pointer hover:brightness-95"
+              }`}
             >
               Passar A Vez
             </button>
             <button
               onClick={() => setFinalAnswerMode(true)}
-              className="flex-1 h-14 rounded-2xl font-extrabold bg-white text-neutral-800 cursor-pointer hover:brightness-95"
+              disabled={waitingAnswer}
+              className={`flex-1 h-14 rounded-2xl font-extrabold bg-white text-neutral-800 ${
+                waitingAnswer
+                  ? "opacity-50 cursor-not-allowed"
+                  : "cursor-pointer hover:brightness-95"
+              }`}
             >
               Resposta Final
             </button>

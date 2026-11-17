@@ -33,6 +33,11 @@ function CoringaPage() {
             ? "secreto"
             : "done";
 
+  const blockedId =
+    currentStep === "coringa"
+      ? gameView.opponentSecretCharacterId
+      : gameView.myCoringaId;
+
   function handleConfirm() {
     if (!selectedId) return;
     if (currentStep === "coringa") {
@@ -95,14 +100,18 @@ function CoringaPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4 w-full max-w-4xl">
         {gameView.characters.map((character) => {
           const isSelected = selectedId === character.id;
+          const isBlocked = character.id === blockedId;
           return (
             <button
               key={character.id}
               onClick={() => setSelectedId(character.id)}
+              disabled={isBlocked}
               className={`relative z-10 flex flex-col items-center gap-2 rounded-2xl p-3 transition ${
                 isSelected
                   ? "bg-white ring-4 ring-yellow-400 scale-[1.03]"
-                  : "bg-[#a13a4a] hover:bg-[#b04555]"
+                  : isBlocked
+                    ? "bg-[#5d2a2d] opacity-60 cursor-not-allowed"
+                    : "bg-[#a13a4a] hover:bg-[#b04555]"
               }`}
             >
               <img

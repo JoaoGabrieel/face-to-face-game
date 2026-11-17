@@ -27,14 +27,14 @@ function ResultadoPage() {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center gap-6 bg-gradient-to-b from-[#9c1e40] via-[#d94f2b] to-[#f2941a] p-6">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center gap-6 bg-gradient-to-b from-[#9c1e40] via-[#d94f2b] to-[#f2941a] p-6 py-10">
       <div className="text-7xl">{iWon ? "🏆" : "💀"}</div>
 
       <h1 className="text-white font-extrabold text-3xl text-center">
         {iWon ? "Parabéns! Você venceu!" : "Você não conseguiu dessa vez!"}
       </h1>
 
-      <div className="bg-white/90 rounded-2xl p-5 w-full max-w-sm">
+      <div className="bg-white rounded-2xl p-5 w-full max-w-sm">
         {gameView.winners.length > 0 && (
           <p className="text-neutral-800 font-bold text-center mb-2">
             🏆 Venceram: {gameView.winners.join(", ")}
@@ -46,24 +46,57 @@ function ResultadoPage() {
           </p>
         )}
       </div>
-      {gameView.revealBoard && (
+
+      {gameView.revealBoards && (
         <div className="w-full max-w-3xl flex flex-col gap-4">
-          {gameView.revealBoard.map((board) => {
+          {gameView.revealBoards.map((board) => {
             const secretChar = gameView.characters.find(
               (c) => c.id === board.secretCharacterId,
             );
+            const coringaChar = gameView.characters.find(
+              (c) => c.id === board.coringaId,
+            );
+
             return (
-              <div key={board.playerId} className="bg-white/90 rounded-2xl p-4">
-                <div className="flex items-center justify-between mb-2">
+              <div key={board.playerId} className="bg-white rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3">
                   <p className="font-extrabold text-neutral-800">
                     {board.username} {board.result === "won" ? "🏆" : "💀"}
                   </p>
-                  {secretChar && (
-                    <p className="text-sm text-neutral-600 font-semibold">
-                      Segredo: {secretChar.name}
-                    </p>
-                  )}
                 </div>
+
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className="rounded-xl bg-orange-500 p-2 flex items-center gap-2">
+                    {secretChar && (
+                      <img
+                        src={secretChar.imageUrl}
+                        alt={secretChar.name}
+                        className="w-10 h-10 rounded-full bg-white shrink-0"
+                      />
+                    )}
+                    <div className="text-white text-xs font-bold leading-tight">
+                      🎯 Segredo
+                      <br />
+                      {secretChar?.name}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl bg-neutral-900 p-2 flex items-center gap-2">
+                    {coringaChar && (
+                      <img
+                        src={coringaChar.imageUrl}
+                        alt={coringaChar.name}
+                        className="w-10 h-10 rounded-full bg-white shrink-0"
+                      />
+                    )}
+                    <div className="text-white text-xs font-bold leading-tight">
+                      ☠️ Coringa p/ {board.coringaTargetUsername}
+                      <br />
+                      {coringaChar?.name ?? "—"}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-5 sm:grid-cols-8 gap-2">
                   {gameView.characters.map((character) => {
                     const discarded = board.eliminated.includes(character.id);
@@ -92,7 +125,7 @@ function ResultadoPage() {
 
       <button
         onClick={handleBackToLobby}
-        className="mt-4 h-14 px-8 rounded-2xl font-extrabold text-lg bg-white text-neutral-800 cursor-pointer hover:brightness-95 active:scale-[0.97]"
+        className="mt-2 h-14 px-8 rounded-2xl font-extrabold text-lg bg-white text-neutral-800 cursor-pointer border-b-4 border-neutral-300 transition-all hover:brightness-95 active:border-b-0 active:translate-y-1"
       >
         Voltar ao Lobby
       </button>

@@ -13,6 +13,17 @@ export interface PlayerInfo {
   active: boolean;
 }
 
+export interface RevealedBoard {
+  playerId: string;
+  username: string;
+  secretCharacterId: string;
+  coringaId: string | null;
+  coringaTargetUsername: string;
+  eliminated: string[];
+  selected: string[];
+  result: "won" | "lost" | null;
+}
+
 export interface QuestionLogEntry {
   id: string;
   playerId: string;
@@ -25,6 +36,7 @@ export interface RevealedBoard {
   playerId: string;
   username: string;
   secretCharacterId: string;
+  coringaId: string | null;
   eliminated: string[];
   selected: string[];
   result: "won" | "lost" | null;
@@ -64,4 +76,12 @@ export interface GameView {
   assignmentMode: AssignmentMode;
   myCoringaChosen: boolean;
   mySecretChosen: boolean;
+  coringaId: string | null;
+  coringaTargetUsername: string | null;
+  revealBoards: RevealedBoard[] | null;
+  turnResponderUsername: string;
+  turnPlayerSecretId: string | null;
+  turnPlayerPoisonId: string | null;
+  skippedPlayers: string[];
+  lastWrongPlayer: string | null;
 }
